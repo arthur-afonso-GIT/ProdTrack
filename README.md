@@ -15,14 +15,11 @@ ProdTrack/
 ├── database.py                 # Conexão e criação das tabelas SQLite
 ├── models.py                    # Regras de negócio, CRUD, autocomplete, configurações
 │
+├── qml/
+│   ├── Main.qml                  # Janela, navegação e telas Qt Quick
+│   └── ActivityDialog.qml        # Diálogo de edição de atividade
 ├── ui/
-│   ├── theme.py                 # Cores, tipografia e espaçamentos (design system)
-│   ├── autocomplete_entry.py     # Campo de texto com sugestões (usado em "Atividade")
-│   ├── main_window.py            # Janela principal + navegação superior
-│   ├── dashboard_frame.py        # Tela Início (resumo do dia + formulário + recentes)
-│   ├── history_frame.py          # Tela Histórico (filtros + tabela paginada)
-│   ├── reports_frame.py          # Tela Relatórios (PDF + Excel)
-│   └── settings_frame.py         # Tela Configurações
+│   └── app_controller.py         # Ponte PySide6 entre o QML e as regras de negócio
 │
 ├── services/
 │   ├── report_generator.py       # Geração de PDF (ReportLab)
@@ -62,9 +59,8 @@ ProdTrack/
    pip install -r requirements.txt
    ```
 
-   > **Linux**: CustomTkinter depende do Tcl/Tk do sistema. Se a instalação
-   > falhar reclamando de `tkinter`, instale o pacote do seu SO antes:
-   > `sudo apt install python3-tk` (Ubuntu/Debian) ou equivalente.
+   > A interface utiliza **PySide6 + Qt Quick/QML**. O pacote PySide6 inclui
+   > os componentes Qt necessários para executar a aplicação.
 
 ## ▶️ Executando a aplicação
 
@@ -90,6 +86,8 @@ consultando estatísticas. Por isso:
   `[ Início ] [ Histórico ] [ Relatórios ] [ Configurações ]`.
 - O campo **Atividade** tem autocomplete: ao digitar, sugestões do seu
   próprio histórico aparecem (as mais usadas primeiro).
+- **Atividades fixas** podem ser criadas nas Configurações com nome, tempo,
+  evidência e observações padrão; no Início, um clique preenche o formulário.
 - O botão **↻ Repetir última** copia atividade e evidência do último
   registro — você só ajusta o tempo.
 - Backup, diretórios padrão e importação/exportação de Excel ficam
@@ -100,9 +98,9 @@ consultando estatísticas. Por isso:
 | Tela | O que tem |
 |---|---|
 | **🏠 Início** | Resumo do dia (1 linha) + formulário de registro rápido (com autocomplete) + atividades recentes (editar/duplicar/excluir) |
-| **📋 Histórico** | Filtros por data e atividade + tabela paginada com as mesmas ações |
+| **📋 Histórico** | Visões personalizada, mensal, trimestral e semestral + busca e ações |
 | **📄 Relatórios** | PDF diário, mensal, trimestral ou semestral + exportação Excel do período — sem gráficos |
-| **⚙️ Configurações** | Jornada diária (6h/7h/8h), diretórios padrão de relatórios e backups, importar/exportar Excel completo, backup manual e restauração |
+| **⚙️ Configurações** | Jornada, atividades fixas, diretórios, Excel, backup manual e restauração |
 
 ## 📋 Formato esperado para importação de Excel
 
@@ -140,11 +138,21 @@ Backup manual e restauração ficam em **⚙️ Configurações**.
 Para distribuir o ProdTrack sem exigir Python instalado, é possível
 empacotar com PyInstaller:
 
-```bash
-pip install pyinstaller
-pyinstaller --noconsole --onefile --name ProdTrack main.py
+```powershell
+pyinstaller --noconfirm --clean .\ProdTrack.spec
 ```
 
-O executável gerado aparecerá em `dist/ProdTrack`. Copie as pastas
-`relatorios/` e `backups/` (ou deixe o app criá-las automaticamente) para
-o mesmo diretório do executável.
+O pacote executável será criado em `dist/ProdTrack`. Banco, backups e
+relatórios são armazenados separadamente no perfil do usuário.
+
+## 📦 Gerando o instalador Windows
+
+Com PyInstaller e NSIS disponíveis nos caminhos configurados, execute:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build_installer.ps1
+```
+
+O instalador será criado em `release/ProdTrack-Setup-1.0.0.exe`. O aplicativo
+é instalado para o usuário atual, sem exigir privilégios administrativos. Os
+dados ficam em `%LOCALAPPDATA%\ProdTrack` e são preservados na desinstalação.

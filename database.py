@@ -12,6 +12,7 @@ Esta camada não depende de nenhum framework de UI — pode ser usada
 isoladamente em testes ou em scripts utilitários.
 """
 
+import os
 import sqlite3
 import sys
 from contextlib import contextmanager
@@ -21,11 +22,14 @@ from pathlib import Path
 def _base_dir() -> Path:
     """
     Resolve a pasta base do aplicativo.
-    Quando empacotado com PyInstaller, sys.executable apontará para o
-    binário gerado; em modo desenvolvimento, usamos a pasta deste arquivo.
+    Em uma instalação Windows, os dados ficam no perfil gravável do usuário,
+    separados dos binários instalados. Em desenvolvimento, usamos o projeto.
     """
     if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        path = Path(local_app_data) / "ProdTrack" if local_app_data else Path.home() / ".prodtrack"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
     return Path(__file__).resolve().parent
 
 
@@ -92,6 +96,20 @@ def init_db():
             CREATE TABLE IF NOT EXISTS configuracoes (
                 chave TEXT PRIMARY KEY,
                 valor TEXT NOT NULL
+            );
+            """
+        )
+
+        # Modelos reutilizáveis criados pelo usuário para registros frequentes.
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS atividades_fixas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nome_atividade TEXT NOT NULL,
+                tempo_minutos INTEGER NOT NULL CHECK (tempo_minutos > 0),
+                evidencia TEXT DEFAULT '',
+                observacoes TEXT DEFAULT '',
+                criado_em TEXT DEFAULT (datetime('now', 'localtime'))
             );
             """
         )

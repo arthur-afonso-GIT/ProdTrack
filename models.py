@@ -188,6 +188,46 @@ def sugerir_atividades(texto_digitado: str, limite: int = 8) -> list[str]:
 
 
 # --------------------------------------------------------------------------
+# Atividades fixas (modelos reutilizáveis criados pelo usuário)
+# --------------------------------------------------------------------------
+
+
+def criar_atividade_fixa(
+    nome_atividade: str,
+    tempo_minutos: int,
+    evidencia: str = "",
+    observacoes: str = "",
+) -> int:
+    nome = nome_atividade.strip()
+    minutos = int(tempo_minutos)
+    if not nome or minutos <= 0:
+        raise ValueError("Informe um nome e um tempo maior que zero.")
+    with get_connection() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO atividades_fixas
+                (nome_atividade, tempo_minutos, evidencia, observacoes)
+            VALUES (?, ?, ?, ?);
+            """,
+            (nome, minutos, evidencia.strip(), observacoes.strip()),
+        )
+        return cur.lastrowid
+
+
+def listar_atividades_fixas() -> list[dict]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM atividades_fixas ORDER BY nome_atividade COLLATE NOCASE;"
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def excluir_atividade_fixa(atividade_fixa_id: int) -> None:
+    with get_connection() as conn:
+        conn.execute("DELETE FROM atividades_fixas WHERE id = ?;", (atividade_fixa_id,))
+
+
+# --------------------------------------------------------------------------
 # Configurações (jornada diária, diretórios)
 # --------------------------------------------------------------------------
 

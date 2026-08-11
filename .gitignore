@@ -1,2 +1,11 @@
 venv/Lib/site-packages/pip/_internal/cache.py
 /venv
+/.venv
+__pycache__/
+*.py[cod]
+/database.db
+/backups/*.db
+/relatorios/*
+/build/
+/dist/
+/release/*.exe
