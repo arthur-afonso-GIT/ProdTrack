@@ -16,7 +16,10 @@ Dialog {
         activityId = id
         day.text = item.date || ""
         activity.text = item.name || ""
-        minutes.text = item.minutes || ""
+        hours.text = item.hours || "0"
+        minutes.text = item.minutes || "0"
+        start.text = item.start || ""
+        end.text = item.end || ""
         evidence.text = item.evidence || ""
         notes.text = item.notes || ""
         open()
@@ -28,8 +31,21 @@ Dialog {
         TextField { id: day; Layout.fillWidth: true; placeholderText: "dd/mm/aaaa" }
         Label { text: "Atividade" }
         TextField { id: activity; Layout.fillWidth: true }
-        Label { text: "Tempo gasto (min)" }
-        TextField { id: minutes; Layout.fillWidth: true; inputMethodHints: Qt.ImhDigitsOnly }
+        Label { text: "Duração" }
+        RowLayout {
+            Layout.fillWidth: true
+            TextField { id: hours; Layout.fillWidth: true; placeholderText: "Horas"; inputMethodHints: Qt.ImhDigitsOnly }
+            Label { text: "h" }
+            TextField { id: minutes; Layout.fillWidth: true; placeholderText: "Minutos"; inputMethodHints: Qt.ImhDigitsOnly }
+            Label { text: "min" }
+        }
+        Label { text: "Horário (opcional — calcula a duração)" }
+        RowLayout {
+            Layout.fillWidth: true
+            TextField { id: start; Layout.fillWidth: true; placeholderText: "Início  HH:MM"; maximumLength: 5 }
+            Label { text: "até" }
+            TextField { id: end; Layout.fillWidth: true; placeholderText: "Término  HH:MM"; maximumLength: 5 }
+        }
         Label { text: "Evidência" }
         TextField { id: evidence; Layout.fillWidth: true }
         Label { text: "Observações" }
@@ -42,7 +58,8 @@ Dialog {
                 highlighted: true
                 Layout.fillWidth: true
                 onClicked: if (appController.updateActivity(root.activityId, day.text, activity.text,
-                                                              minutes.text, evidence.text, notes.text)) root.close()
+                                                              hours.text, minutes.text, start.text, end.text,
+                                                              evidence.text, notes.text)) root.close()
             }
         }
     }

@@ -82,6 +82,8 @@ def init_db():
                 data TEXT NOT NULL,                 -- formato YYYY-MM-DD
                 nome_atividade TEXT NOT NULL,
                 tempo_minutos INTEGER NOT NULL CHECK (tempo_minutos > 0),
+                hora_inicio TEXT,
+                hora_fim TEXT,
                 evidencia TEXT,                      -- link ou caminho de arquivo
                 observacoes TEXT,
                 criado_em TEXT DEFAULT (datetime('now', 'localtime')),
@@ -89,6 +91,15 @@ def init_db():
             );
             """
         )
+
+        # Migra bancos existentes sem apagar dados.
+        colunas_atividades = {
+            row["name"] for row in conn.execute("PRAGMA table_info(atividades);").fetchall()
+        }
+        if "hora_inicio" not in colunas_atividades:
+            conn.execute("ALTER TABLE atividades ADD COLUMN hora_inicio TEXT;")
+        if "hora_fim" not in colunas_atividades:
+            conn.execute("ALTER TABLE atividades ADD COLUMN hora_fim TEXT;")
 
         # Tabela de configurações (jornada diária, diretórios, etc.)
         cur.execute(

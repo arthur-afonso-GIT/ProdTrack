@@ -23,19 +23,24 @@ def criar_atividade(
     tempo_minutos: int,
     evidencia: str = "",
     observacoes: str = "",
+    hora_inicio: str = "",
+    hora_fim: str = "",
 ) -> int:
     """Insere uma nova atividade e retorna o ID gerado."""
     with get_connection() as conn:
         cur = conn.cursor()
         cur.execute(
             """
-            INSERT INTO atividades (data, nome_atividade, tempo_minutos, evidencia, observacoes)
-            VALUES (?, ?, ?, ?, ?);
+            INSERT INTO atividades
+                (data, nome_atividade, tempo_minutos, hora_inicio, hora_fim, evidencia, observacoes)
+            VALUES (?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 data_atividade.isoformat(),
                 nome_atividade.strip(),
                 int(tempo_minutos),
+                hora_inicio.strip() or None,
+                hora_fim.strip() or None,
                 evidencia.strip() if evidencia else "",
                 observacoes.strip() if observacoes else "",
             ),
@@ -50,6 +55,8 @@ def atualizar_atividade(
     tempo_minutos: int,
     evidencia: str = "",
     observacoes: str = "",
+    hora_inicio: str = "",
+    hora_fim: str = "",
 ) -> None:
     """Atualiza uma atividade existente pelo ID."""
     with get_connection() as conn:
@@ -59,6 +66,8 @@ def atualizar_atividade(
             SET data = ?,
                 nome_atividade = ?,
                 tempo_minutos = ?,
+                hora_inicio = ?,
+                hora_fim = ?,
                 evidencia = ?,
                 observacoes = ?,
                 atualizado_em = datetime('now', 'localtime')
@@ -68,6 +77,8 @@ def atualizar_atividade(
                 data_atividade.isoformat(),
                 nome_atividade.strip(),
                 int(tempo_minutos),
+                hora_inicio.strip() or None,
+                hora_fim.strip() or None,
                 evidencia.strip() if evidencia else "",
                 observacoes.strip() if observacoes else "",
                 atividade_id,
@@ -112,6 +123,8 @@ def duplicar_atividade(atividade_id: int) -> Optional[int]:
         tempo_minutos=original["tempo_minutos"],
         evidencia=original["evidencia"] or "",
         observacoes=original["observacoes"] or "",
+        hora_inicio=original.get("hora_inicio") or "",
+        hora_fim=original.get("hora_fim") or "",
     )
 
 
@@ -389,6 +402,8 @@ COLUNAS_EXPORT = [
     "data",
     "nome_atividade",
     "tempo_minutos",
+    "hora_inicio",
+    "hora_fim",
     "evidencia",
     "observacoes",
 ]
@@ -397,20 +412,25 @@ COLUNAS_EXPORT = [
 def exportar_para_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """Prepara um DataFrame de atividades para exportação (colunas e nomes amigáveis)."""
     if df.empty:
-        return pd.DataFrame(columns=["Data", "Atividade", "Minutos", "Horas", "Evidência", "Observações"])
+        return pd.DataFrame(columns=["Data", "Atividade", "Início", "Término", "Minutos", "Duração", "Evidência", "Observações"])
 
     export_df = df.copy()
-    export_df["Horas"] = export_df["tempo_minutos"].apply(minutos_para_horas_str)
+    export_df["Duração"] = export_df["tempo_minutos"].apply(minutos_para_horas_str)
+    for column in ("hora_inicio", "hora_fim"):
+        if column not in export_df:
+            export_df[column] = ""
     export_df = export_df.rename(
         columns={
             "data": "Data",
             "nome_atividade": "Atividade",
             "tempo_minutos": "Minutos",
+            "hora_inicio": "Início",
+            "hora_fim": "Término",
             "evidencia": "Evidência",
             "observacoes": "Observações",
         }
     )
-    return export_df[["Data", "Atividade", "Minutos", "Horas", "Evidência", "Observações"]]
+    return export_df[["Data", "Atividade", "Início", "Término", "Minutos", "Duração", "Evidência", "Observações"]]
 
 
 def importar_de_dataframe(df_importado: pd.DataFrame) -> tuple[int, list[str]]:
@@ -431,6 +451,8 @@ def importar_de_dataframe(df_importado: pd.DataFrame) -> tuple[int, list[str]]:
         "data": ["data"],
         "nome_atividade": ["atividade", "nome da atividade", "nome_atividade"],
         "tempo_minutos": ["minutos", "tempo gasto", "tempo gasto (em minutos)", "tempo_minutos"],
+        "hora_inicio": ["inicio", "início", "hora_inicio", "hora de inicio", "hora de início"],
+        "hora_fim": ["termino", "término", "hora_fim", "hora de termino", "hora de término"],
         "evidencia": ["evidencia", "evidência"],
         "observacoes": ["observacoes", "observações"],
     }
@@ -457,17 +479,23 @@ def importar_de_dataframe(df_importado: pd.DataFrame) -> tuple[int, list[str]]:
             minutos = int(float(linha[coluna_real["tempo_minutos"]]))
             evidencia = str(linha[coluna_real.get("evidencia", "")]).strip() if "evidencia" in coluna_real else ""
             observ = str(linha[coluna_real.get("observacoes", "")]).strip() if "observacoes" in coluna_real else ""
+            hora_inicio = str(linha[coluna_real.get("hora_inicio", "")]).strip() if "hora_inicio" in coluna_real else ""
+            hora_fim = str(linha[coluna_real.get("hora_fim", "")]).strip() if "hora_fim" in coluna_real else ""
 
             if evidencia.lower() == "nan":
                 evidencia = ""
             if observ.lower() == "nan":
                 observ = ""
+            if hora_inicio.lower() == "nan":
+                hora_inicio = ""
+            if hora_fim.lower() == "nan":
+                hora_fim = ""
 
             if not nome or minutos <= 0:
                 erros.append(f"Linha {idx + 2}: dados inválidos (nome vazio ou minutos <= 0).")
                 continue
 
-            criar_atividade(data_valor, nome, minutos, evidencia, observ)
+            criar_atividade(data_valor, nome, minutos, evidencia, observ, hora_inicio, hora_fim)
             importados += 1
         except Exception as exc:  # noqa: BLE001
             erros.append(f"Linha {idx + 2}: erro ao importar ({exc}).")

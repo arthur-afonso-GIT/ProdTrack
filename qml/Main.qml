@@ -97,7 +97,10 @@ ApplicationWindow {
                             text: modelData.name + " · " + modelData.duration
                             onClicked: {
                                 inputActivity.text = modelData.name
-                                inputMinutes.text = String(modelData.minutes)
+                                inputHours.text = String(Math.floor(modelData.minutes / 60))
+                                inputMinutes.text = String(modelData.minutes % 60)
+                                inputStart.clear()
+                                inputEnd.clear()
                                 inputEvidence.text = modelData.evidence
                                 inputNotes.text = modelData.notes
                             }
@@ -120,22 +123,48 @@ ApplicationWindow {
                             }
                             ColumnLayout {
                                 Layout.fillWidth: true
-                                Label { text: "Tempo gasto (min)" }
-                                TextField { id: inputMinutes; text: "30"; Layout.fillWidth: true; inputMethodHints: Qt.ImhDigitsOnly }
+                                Label { text: "Atividade" }
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    TextField { id: inputActivity; Layout.fillWidth: true; placeholderText: "O que você fez?" }
+                                    Button {
+                                        text: "Repetir última"
+                                        flat: true
+                                        Layout.alignment: Qt.AlignVCenter
+                                        onClicked: {
+                                            const item = appController.repeatLast()
+                                            if (item.name) {
+                                                inputActivity.text = item.name; inputHours.text = item.hours
+                                                inputMinutes.text = item.minutes; inputStart.text = item.start
+                                                inputEnd.text = item.end; inputEvidence.text = item.evidence
+                                                inputNotes.text = item.notes
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                         RowLayout {
                             Layout.fillWidth: true
                             ColumnLayout {
                                 Layout.fillWidth: true
-                                Label { text: "Atividade" }
-                                TextField { id: inputActivity; Layout.fillWidth: true; placeholderText: "O que você fez?" }
+                                Label { text: "Duração" }
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    TextField { id: inputHours; text: "0"; placeholderText: "Horas"; Layout.fillWidth: true; inputMethodHints: Qt.ImhDigitsOnly }
+                                    Label { text: "h" }
+                                    TextField { id: inputMinutes; text: "30"; placeholderText: "Minutos"; Layout.fillWidth: true; inputMethodHints: Qt.ImhDigitsOnly }
+                                    Label { text: "min" }
+                                }
                             }
-                            Button {
-                                text: "Repetir última"
-                                onClicked: {
-                                    const item = appController.repeatLast()
-                                    if (item.name) { inputActivity.text = item.name; inputMinutes.text = item.minutes; inputEvidence.text = item.evidence; inputNotes.text = item.notes }
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                Label { text: "Horário (opcional — calcula a duração)" }
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    TextField { id: inputStart; placeholderText: "Início  HH:MM"; Layout.fillWidth: true; maximumLength: 5 }
+                                    Label { text: "até" }
+                                    TextField { id: inputEnd; placeholderText: "Término  HH:MM"; Layout.fillWidth: true; maximumLength: 5 }
                                 }
                             }
                         }
@@ -149,8 +178,13 @@ ApplicationWindow {
                         TextArea { id: inputNotes; Layout.fillWidth: true; Layout.preferredHeight: 65; wrapMode: TextEdit.Wrap }
                         Button {
                             text: "Salvar atividade"; highlighted: true; Layout.fillWidth: true
-                            onClicked: if (appController.createActivity(inputDay.text, inputActivity.text, inputMinutes.text, inputEvidence.text, inputNotes.text)) {
-                                inputDay.text = window.todayText; inputActivity.clear(); inputMinutes.text = "30"; inputEvidence.clear(); inputNotes.clear(); inputActivity.forceActiveFocus()
+                            onClicked: if (appController.createActivity(inputDay.text, inputActivity.text,
+                                                                        inputHours.text, inputMinutes.text,
+                                                                        inputStart.text, inputEnd.text,
+                                                                        inputEvidence.text, inputNotes.text)) {
+                                inputDay.text = window.todayText; inputActivity.clear(); inputHours.text = "0"
+                                inputMinutes.text = "30"; inputStart.clear(); inputEnd.clear()
+                                inputEvidence.clear(); inputNotes.clear(); inputActivity.forceActiveFocus()
                             }
                         }
                     }
@@ -168,7 +202,12 @@ ApplicationWindow {
                             ColumnLayout {
                                 Layout.fillWidth: true; spacing: 2
                                 Label { text: modelData.name; font.bold: true; color: "#101828" }
-                                Label { text: modelData.date + " · " + modelData.duration + (modelData.evidence ? " · " + modelData.evidence : ""); color: "#667085"; elide: Text.ElideRight; Layout.fillWidth: true }
+                                Label {
+                                    text: modelData.date + " · " + modelData.duration
+                                          + (modelData.schedule ? " · " + modelData.schedule : "")
+                                          + (modelData.evidence ? " · " + modelData.evidence : "")
+                                    color: "#667085"; elide: Text.ElideRight; Layout.fillWidth: true
+                                }
                             }
                             Button { text: "Editar"; flat: true; onClicked: editDialog.openActivity(modelData.id) }
                             Button { text: "Duplicar"; flat: true; onClicked: appController.duplicateActivity(modelData.id) }
@@ -230,6 +269,7 @@ ApplicationWindow {
                     Label { text: "Data"; font.bold: true; Layout.preferredWidth: 100 }
                     Label { text: "Atividade"; font.bold: true; Layout.fillWidth: true }
                     Label { text: "Tempo"; font.bold: true; Layout.preferredWidth: 100 }
+                    Label { text: "Horário"; font.bold: true; Layout.preferredWidth: 110 }
                     Label { text: "Ações"; font.bold: true; Layout.preferredWidth: 190 }
                 }
             }
@@ -243,6 +283,7 @@ ApplicationWindow {
                         Label { text: modelData.date; Layout.preferredWidth: 100 }
                         Label { text: modelData.name; Layout.fillWidth: true; elide: Text.ElideRight }
                         Label { text: modelData.duration; Layout.preferredWidth: 100 }
+                        Label { text: modelData.schedule || "—"; Layout.preferredWidth: 110; color: "#667085" }
                         RowLayout { Layout.preferredWidth: 190
                             Button { text: "Editar"; flat: true; onClicked: editDialog.openActivity(modelData.id) }
                             Button { text: "Duplicar"; flat: true; onClicked: { appController.duplicateActivity(modelData.id); historyPage.applyFilter() } }
@@ -315,11 +356,16 @@ ApplicationWindow {
                         RowLayout {
                             Layout.fillWidth: true
                             TextField { id: fixedName; placeholderText: "Nome da atividade"; Layout.fillWidth: true }
-                            TextField { id: fixedMinutes; placeholderText: "Tempo (min)"; inputMethodHints: Qt.ImhDigitsOnly; Layout.preferredWidth: 140 }
+                            TextField { id: fixedHours; placeholderText: "Horas"; inputMethodHints: Qt.ImhDigitsOnly; Layout.preferredWidth: 90 }
+                            Label { text: "h" }
+                            TextField { id: fixedMinutes; placeholderText: "Minutos"; inputMethodHints: Qt.ImhDigitsOnly; Layout.preferredWidth: 100 }
+                            Label { text: "min" }
                             Button {
                                 text: "Criar atividade fixa"; highlighted: true
-                                onClicked: if (appController.createFixedActivity(fixedName.text, fixedMinutes.text, fixedEvidence.text, fixedNotes.text)) {
-                                    fixedName.clear(); fixedMinutes.clear(); fixedEvidence.clear(); fixedNotes.clear()
+                                onClicked: if (appController.createFixedActivity(fixedName.text, fixedHours.text,
+                                                                                fixedMinutes.text, fixedEvidence.text,
+                                                                                fixedNotes.text)) {
+                                    fixedName.clear(); fixedHours.clear(); fixedMinutes.clear(); fixedEvidence.clear(); fixedNotes.clear()
                                 }
                             }
                         }

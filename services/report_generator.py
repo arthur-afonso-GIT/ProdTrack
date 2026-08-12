@@ -111,7 +111,7 @@ def _tabela_resumo(resumo: dict, jornada_horas: int):
 
 
 def _tabela_detalhada(df: pd.DataFrame):
-    cabecalho = ["Data", "Atividade", "Tempo", "Evidência", "Observações"]
+    cabecalho = ["Data", "Atividade", "Tempo", "Horário", "Evidência", "Observações"]
     linhas = [cabecalho]
     body_style = getSampleStyleSheet()["BodyText"]
 
@@ -122,6 +122,10 @@ def _tabela_detalhada(df: pd.DataFrame):
                 data_str,
                 Paragraph(str(row["nome_atividade"]), body_style),
                 models.minutos_para_horas_str(row["tempo_minutos"]),
+                (
+                    f'{row.get("hora_inicio")}–{row.get("hora_fim")}'
+                    if row.get("hora_inicio") and row.get("hora_fim") else "-"
+                ),
                 Paragraph(str(row.get("evidencia") or "-"), body_style),
                 Paragraph(str(row.get("observacoes") or "-"), body_style),
             ]
@@ -129,7 +133,7 @@ def _tabela_detalhada(df: pd.DataFrame):
 
     tabela = Table(
         linhas,
-        colWidths=[2.2 * cm, 4.5 * cm, 1.8 * cm, 4 * cm, 4 * cm],
+        colWidths=[2.0 * cm, 3.7 * cm, 1.5 * cm, 1.8 * cm, 3.6 * cm, 3.6 * cm],
         repeatRows=1,
     )
     tabela.setStyle(

@@ -28,15 +28,51 @@ def _parse_date(value: str) -> date:
 
 
 def _row_dict(row) -> dict:
+    start = str(row.get("hora_inicio") or "")
+    end = str(row.get("hora_fim") or "")
     return {
         "id": int(row["id"]),
         "date": row["data"].strftime("%d/%m/%Y"),
         "name": str(row["nome_atividade"]),
         "minutes": int(row["tempo_minutos"]),
         "duration": models.minutos_para_horas_str(row["tempo_minutos"]),
+        "start": start,
+        "end": end,
+        "schedule": f"{start}–{end}" if start and end else "",
         "evidence": str(row.get("evidencia") or ""),
         "notes": str(row.get("observacoes") or ""),
     }
+
+
+def _resolve_duration(hours: str, minutes: str, start: str, end: str) -> tuple[int, str, str]:
+    start = start.strip()
+    end = end.strip()
+    if start or end:
+        if not start or not end:
+            raise ValueError("Informe os horários de início e término.")
+        try:
+            start_time = datetime.strptime(start, "%H:%M")
+            end_time = datetime.strptime(end, "%H:%M")
+        except ValueError as exc:
+            raise ValueError("Horário inválido. Use o formato HH:MM.") from exc
+        total = int((end_time - start_time).total_seconds() // 60)
+        if total < 0:
+            total += 24 * 60
+        if total == 0:
+            raise ValueError("O horário de término deve ser diferente do início.")
+        return total, start_time.strftime("%H:%M"), end_time.strftime("%H:%M")
+
+    try:
+        hour_value = int(hours or 0)
+        minute_value = int(minutes or 0)
+    except ValueError as exc:
+        raise ValueError("Horas e minutos devem ser números inteiros.") from exc
+    if hour_value < 0 or minute_value < 0 or minute_value > 59:
+        raise ValueError("Use horas positivas e minutos entre 0 e 59.")
+    total = hour_value * 60 + minute_value
+    if total <= 0:
+        raise ValueError("Informe uma duração maior que zero.")
+    return total, "", ""
 
 
 class AppController(QObject):
@@ -123,13 +159,16 @@ class AppController(QObject):
     def suggestions(self, text):
         return models.sugerir_atividades(text)
 
-    @Slot(str, str, str, str, str, result=bool)
-    def createActivity(self, day, name, minutes, evidence, notes):
+    @Slot(str, str, str, str, str, str, str, str, result=bool)
+    def createActivity(self, day, name, hours, minutes, start, end, evidence, notes):
         try:
-            parsed_minutes = int(minutes)
-            if parsed_minutes <= 0 or not name.strip():
-                raise ValueError("Informe uma atividade e um tempo maior que zero.")
-            models.criar_atividade(_parse_date(day), name, parsed_minutes, evidence, notes)
+            if not name.strip():
+                raise ValueError("Informe o nome da atividade.")
+            total, normalized_start, normalized_end = _resolve_duration(hours, minutes, start, end)
+            models.criar_atividade(
+                _parse_date(day), name, total, evidence, notes,
+                normalized_start, normalized_end,
+            )
             self._refresh_all()
             self.message.emit("Atividade salva", "O registro foi adicionado com sucesso.", False)
             return True
@@ -143,25 +182,34 @@ class AppController(QObject):
         if not item:
             self.message.emit("ProdTrack", "Ainda não há atividades registradas.", False)
             return {}
-        return {"name": item["nome_atividade"], "minutes": str(item["tempo_minutos"]),
-                "evidence": item["evidencia"] or "", "notes": item["observacoes"] or ""}
+        total = int(item["tempo_minutos"])
+        return {"name": item["nome_atividade"], "hours": str(total // 60),
+                "minutes": str(total % 60), "start": item.get("hora_inicio") or "",
+                "end": item.get("hora_fim") or "", "evidence": item["evidencia"] or "",
+                "notes": item["observacoes"] or ""}
 
     @Slot(int, result="QVariantMap")
     def activity(self, activity_id):
         item = models.buscar_atividade_por_id(activity_id)
         if not item:
             return {}
+        total = int(item["tempo_minutos"])
         return {"id": item["id"], "date": datetime.strptime(item["data"], "%Y-%m-%d").strftime("%d/%m/%Y"),
-                "name": item["nome_atividade"], "minutes": str(item["tempo_minutos"]),
+                "name": item["nome_atividade"], "hours": str(total // 60),
+                "minutes": str(total % 60), "start": item.get("hora_inicio") or "",
+                "end": item.get("hora_fim") or "",
                 "evidence": item["evidencia"] or "", "notes": item["observacoes"] or ""}
 
-    @Slot(int, str, str, str, str, str, result=bool)
-    def updateActivity(self, activity_id, day, name, minutes, evidence, notes):
+    @Slot(int, str, str, str, str, str, str, str, str, result=bool)
+    def updateActivity(self, activity_id, day, name, hours, minutes, start, end, evidence, notes):
         try:
-            value = int(minutes)
-            if value <= 0 or not name.strip():
-                raise ValueError("Informe uma atividade e um tempo maior que zero.")
-            models.atualizar_atividade(activity_id, _parse_date(day), name, value, evidence, notes)
+            if not name.strip():
+                raise ValueError("Informe o nome da atividade.")
+            total, normalized_start, normalized_end = _resolve_duration(hours, minutes, start, end)
+            models.atualizar_atividade(
+                activity_id, _parse_date(day), name, total, evidence, notes,
+                normalized_start, normalized_end,
+            )
             self._refresh_all()
             return True
         except (ValueError, TypeError) as exc:
@@ -216,10 +264,11 @@ class AppController(QObject):
         except (ValueError, TypeError) as exc:
             self.message.emit("Período inválido", str(exc), True)
 
-    @Slot(str, str, str, str, result=bool)
-    def createFixedActivity(self, name, minutes, evidence, notes):
+    @Slot(str, str, str, str, str, result=bool)
+    def createFixedActivity(self, name, hours, minutes, evidence, notes):
         try:
-            models.criar_atividade_fixa(name, int(minutes), evidence, notes)
+            total, _, _ = _resolve_duration(hours, minutes, "", "")
+            models.criar_atividade_fixa(name, total, evidence, notes)
             self._refresh_all()
             self.message.emit("Atividade fixa criada", "O modelo já está disponível no Dashboard.", False)
             return True
